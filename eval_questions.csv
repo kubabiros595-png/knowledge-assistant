@@ -1,0 +1,16 @@
+q_id,question,expected_doc_id,should_answer,expected_keyword
+Q01,How long does it take for the integration status to turn green after I install the script?,D01,true,10 minutes
+Q02,What do I need to set up push notifications for our iPhone app?,D03,true,.p8
+Q03,How often are dynamic segments recalculated?,D04,true,15 minutes
+Q04,How many custom attributes can one subscriber have?,D05,true,50
+Q05,What are the default quiet hours in automations?,D06,true,22:00
+Q06,When should the first abandoned cart reminder go out?,D07,true,1 hour
+Q07,How is CTR calculated in campaign reports?,D08,true,delivered
+Q08,How much is the Growth plan per month?,D10,true,49
+Q09,What happens to our data after we cancel the plan?,D11,true,30 days
+Q10,Who is allowed to invite new users to our account?,D14,true,Admin
+N01,Can NotifyHub send SMS messages to customers?,,false,
+N02,Is there a limit on the number of automations?,,false,
+N03,What uptime SLA do you guarantee?,,false,
+N04,Can I limit how many notifications a subscriber gets per day?,,false,
+N05,Is NotifyHub HIPAA compliant?,,false,

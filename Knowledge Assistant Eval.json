@@ -1,0 +1,283 @@
+{
+  "name": "Knowledge Assistant Eval",
+  "nodes": [
+    {
+      "id": "6b06d4c9-9927-4ebb-8522-fe1a894cf2a6",
+      "name": "Run eval",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "1f1c1bf7-fd7b-440f-99e6-eae6f5d75f09",
+      "name": "Get eval questions",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        240,
+        0
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gA0IdlzetxnvZ4sR",
+          "cachedResultName": "KA Eval Questions"
+        },
+        "returnAll": true,
+        "orderBy": true,
+        "orderByColumn": "id",
+        "orderByDirection": "ASC"
+      }
+    },
+    {
+      "id": "f489da98-995a-4c4c-8a47-e4251df47bef",
+      "name": "Ask Knowledge Assistant",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.4,
+      "position": [
+        480,
+        0
+      ],
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "NUZ4I5JDqTubJFmf",
+          "cachedResultName": "Knowledge Assistant"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "question": "={{ $json.question }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "question",
+              "displayName": "question",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      }
+    },
+    {
+      "id": "1bab6709-099a-474a-9c02-a1866b8f0aff",
+      "name": "Score results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Score results: compare each Knowledge Assistant reply with the expected result.\nconst cases = $('Get eval questions').all().map(i => i.json);\nconst replies = $input.all().map(i => i.json);\n\nlet retrievalHits = 0, citationsCorrect = 0, factsFound = 0;\nlet correctRefusals = 0, falseRefusals = 0, byThreshold = 0, byAi = 0;\nconst mistakes = [];\nconst details = [];\n\ncases.forEach((c, i) => {\n  const r = replies[i] || {};\n  const retrieved = String(r.retrieved_ids || '').split(',').map(s => s.trim()).filter(Boolean);\n  const retrievedDocs = retrieved.map(id => id.split('-')[0]);\n  const cited = String(r.sources || '').split(',').map(s => s.trim()).filter(Boolean);\n  const answered = r.status === 'answered';\n  const row = { q_id: c.q_id, status: r.status, top_score: r.top_score, retrieved: retrieved.join(' '), cited: cited.join(' ') };\n\n  if (c.should_answer) {\n    const hit = retrievedDocs.includes(c.expected_doc_id);\n    const citeOk = answered && cited.length > 0 && cited.every(s => retrieved.includes(s)) &&\n      cited.some(s => s.split('-')[0] === c.expected_doc_id);\n    const factOk = answered && String(r.answer || '').toLowerCase().includes(String(c.expected_keyword).toLowerCase());\n    if (hit) retrievalHits++; else mistakes.push(c.q_id + ': expected ' + c.expected_doc_id + ' not in top results');\n    if (citeOk) citationsCorrect++; else if (answered) mistakes.push(c.q_id + ': wrong citation (' + cited.join(' ') + ')');\n    if (factOk) factsFound++; else if (answered) mistakes.push(c.q_id + ': answer missing \"' + c.expected_keyword + '\"');\n    if (!answered) { falseRefusals++; mistakes.push(c.q_id + ': refused (' + r.status + ')'); }\n    Object.assign(row, { hit, citeOk, factOk });\n  } else {\n    if (r.status === 'ai_error') {\n      mistakes.push(c.q_id + ': said \"I don\\'t know\" only because the AI call failed');\n    } else if (!answered) {\n      correctRefusals++;\n      if (r.status === 'no_match') byThreshold++; else byAi++;\n    } else {\n      mistakes.push(c.q_id + ': answered a question the docs do not cover');\n    }\n    Object.assign(row, { refusedOk: !answered && r.status !== 'ai_error' });\n  }\n  details.push(row);\n});\n\nreturn [{ json: {\n  questions: cases.length,\n  retrieval_hits: retrievalHits,\n  citations_correct: citationsCorrect,\n  facts_found: factsFound,\n  correct_refusals: correctRefusals,\n  false_refusals: falseRefusals,\n  refused_by_threshold: byThreshold,\n  refused_by_ai: byAi,\n  mistakes: mistakes.length ? mistakes.join('; ') : 'none',\n  details\n} }];\n"
+      }
+    },
+    {
+      "id": "9fd8cd4e-9b53-4fb0-a0d4-56fb9539c8d5",
+      "name": "Save eval run",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        960,
+        0
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "insert",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "5qcyFJU7tplWjZBr",
+          "cachedResultName": "KA Eval Runs"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "run_at": "={{ $now.setZone(\"Europe/Warsaw\").toFormat(\"yyyy-MM-dd HH:mm\") }}",
+            "questions": "={{ $json.questions }}",
+            "retrieval_hits": "={{ $json.retrieval_hits }}",
+            "citations_correct": "={{ $json.citations_correct }}",
+            "facts_found": "={{ $json.facts_found }}",
+            "correct_refusals": "={{ $json.correct_refusals }}",
+            "false_refusals": "={{ $json.false_refusals }}",
+            "refused_by_threshold": "={{ $json.refused_by_threshold }}",
+            "refused_by_ai": "={{ $json.refused_by_ai }}",
+            "mistakes": "={{ $json.mistakes }}"
+          },
+          "schema": [
+            {
+              "id": "run_at",
+              "displayName": "run_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "questions",
+              "displayName": "questions",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "retrieval_hits",
+              "displayName": "retrieval_hits",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "citations_correct",
+              "displayName": "citations_correct",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "facts_found",
+              "displayName": "facts_found",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "correct_refusals",
+              "displayName": "correct_refusals",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "false_refusals",
+              "displayName": "false_refusals",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "refused_by_threshold",
+              "displayName": "refused_by_threshold",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "refused_by_ai",
+              "displayName": "refused_by_ai",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "mistakes",
+              "displayName": "mistakes",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Run eval": {
+      "main": [
+        [
+          {
+            "node": "Get eval questions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get eval questions": {
+      "main": [
+        [
+          {
+            "node": "Ask Knowledge Assistant",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ask Knowledge Assistant": {
+      "main": [
+        [
+          {
+            "node": "Score results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Score results": {
+      "main": [
+        [
+          {
+            "node": "Save eval run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "nodeGroups": [
+    {
+      "name": "Score and save",
+      "nodeNames": [
+        "Score results",
+        "Save eval run"
+      ],
+      "description": "Compares each reply with the expected doc, citation, fact and refusal, then saves the totals"
+    }
+  ],
+  "tags": []
+}
