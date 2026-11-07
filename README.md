@@ -25,6 +25,8 @@ flowchart LR
     R --> L
 ```
 
+![n8n workflow: find relevant docs, threshold, answer with Claude, citation check, log](workflow.png)
+
 1. A question arrives from the n8n chat, or from the evaluation workflow.
 2. The workflow reads 43 chunks from the `KA Docs` data table. A chunk is one section of one help article, with `chunk_id`, `doc_id`, `title`, `section` and `text`.
 3. A Code node scores every chunk against the question and keeps the top 4. The score is the share of the question's important words found in the chunk, weighted by how rare each word is in the docs (inverse document frequency). 1.0 means every important word is there, 0 means none.
@@ -106,6 +108,7 @@ I built this project with AI assistance. I defined what a trustworthy answer mea
 - [`eval_questions.csv`](eval_questions.csv): 15 test questions with the expected article and key fact
 - [`test-results.md`](test-results.md): per-question results and answers from the test runs
 - [`MECHANIZM_PL.md`](MECHANIZM_PL.md): study notes in Polish
+- [`workflow.png`](workflow.png): n8n workflow screenshot
 
 ## How to import
 
